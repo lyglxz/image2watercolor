@@ -103,10 +103,10 @@ def Wobble(img, edge, texture, config):
                 img[i][j][2] = 255
             else:
                 offset = int(
-                    0.03
+                    0.05
                     * (
                         int(
-                            edge[(i + texture_height) % texture_height][
+                            texture[(i + texture_height) % texture_height][
                                 (j + texture_width) % texture_width
                             ]
                         )
@@ -114,6 +114,8 @@ def Wobble(img, edge, texture, config):
                     )
                 )
                 img[i][j] = img[i][(j + offset + 720) % 720]
+    cv2.imshow("wobble", img)
+    cv2.waitKey()
     return img
 
 
