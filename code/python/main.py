@@ -1,11 +1,10 @@
-import abstraction
 import tools
-import tester
 import cv2
 import numpy as np
-import os
 import time
-import traceback
+import sys
+import json
+import os
 
 ############################################################
 # notes
@@ -18,12 +17,12 @@ depth = 0
 
 
 class Config(object):
-    input_dir = "../../resource/image/"
-    output_dir = "../../output/"
-    texture_path = "../../resource/image/texture/TextureCombined.jpg"
+    input_dir = "../../resource/image"
+    output_dir = "../../output"
+    texture_dir = "../../resource/image/texture"
     is_edge_darken = True
     is_wobble = True
-    pass
+    is_dry_brush = True
 
 
 class Timer(object):
@@ -46,16 +45,16 @@ def PerformMorph(input):
 
 
 def PerformMeanshift(input):
-    timer = Timer()
+    # timer = Timer()
     cv2.pyrMeanShiftFiltering(input, 10, 25, input, maxLevel=1)
-    print(f"\tMeanshift using {timer.Tick()}")
+    # print(f"\tMeanshift using {timer.Tick()}")
 
 
 def PerformAbstract(input):
-    timer = Timer()
+    # timer = Timer()
     PerformMorph(input)
     PerformMeanshift(input)
-    print(f"\tAbstraction using {timer.Tick()}")
+    # print(f"\tAbstraction using {timer.Tick()}")
 
 
 def EdgeDarken(img, edge, noise_path=None):
@@ -69,7 +68,7 @@ def EdgeDarken(img, edge, noise_path=None):
     # texture = edge / 10.0 + 128
     texture3D = np.stack((texture, texture, texture), axis=2)
     # img = np.float32(img)
-    print(texture3D.shape)
+    # print(texture3D.shape)
     ret = img * (1 - (1 - img / 255) * (2 * texture3D / 255 - 1))
     return ret
 
@@ -83,7 +82,7 @@ def Render(img, noise_path=None):
         texture = tools.LoadImage(noise_path, cv2.IMREAD_GRAYSCALE)
     texture3D = np.stack((texture, texture, texture), axis=2)
     img = np.float32(img)
-    print(texture3D.shape)
+    # print(texture3D.shape)
     ret = img * (1 - (1 - img / 255) * (2 * texture3D / 255 - 1))
     return ret
 
@@ -98,7 +97,7 @@ def Wobble(img, edge, texture, config):
             if edge[i][j] != 255:
                 continue
             offset = texture[i][j]
-            if is_dry_brush and offset == 99:
+            if config.is_dry_brush and offset == 99:
                 img[i][j][0] = 255
                 img[i][j][1] = 255
                 img[i][j][2] = 255
@@ -118,19 +117,24 @@ def Wobble(img, edge, texture, config):
     return img
 
 
-def Watercolorization(img, config):
+def Watercolorization(img, config: Config):
+    timer = Timer()
     PerformAbstract(img)
+    print(f"\tAbstraction \tusing \t{timer.Tick():.3f} sec")
     edge = cv2.Canny(img, 150, 200)
+    print(f"\tEdgeDetect \tusing \t{timer.Tick():.3f} sec")
+    # texture must have same shape
     if config.is_edge_darken:
-        EdgeDarken(img, edge, config.texture_path)
+        EdgeDarken(img, edge, os.path.join(config.texture_dir, "TextureCombined.jpg"))
     else:
         Render(img, config.texture_path)
-
+    print(f"\tRendering \tusing \t{timer.Tick():.3f} sec")
     if config.is_wobble:
         wobble_texture = tools.LoadImage(
             "../../resource/image/texture/perlin_36.jpg", cv2.IMREAD_GRAYSCALE
         )
         img = Wobble(img, edge, wobble_texture, config)
+    print(f"\tWobbling \tusing \t{timer.Tick():.3f} sec")
     return img
 
 
@@ -138,124 +142,56 @@ if __name__ == "__main__":
     ############################################################
     # Settings
     ############################################################
-    is_dry_brush = False
-    # Watercolorization(None, None)
-
+    config = Config()
+    input_name = "01.png"
+    input_path = "{}input/{}".format(config.input_dir, input_name)
+    input_dir = config.input_dir
     ############################################################
     # Main Module
     ############################################################
-    # cv2.setUseOptimized(onoff=True)
-    file_name = "b1.png"
-    config = Config()
-    [name, end] = file_name.split(".")
-    path = "{}input/{}".format(config.input_dir, file_name)
-    img = tools.LoadImage(path)
-    img = Watercolorization(img, config)
+    if len(sys.argv) == 2:
+        # default config
+        input_path = sys.argv[1]
+        print(input_path)
+    elif len(sys.argv) == 3:
+        # use config
+        json_config = json.load(sys.argv[1])
+        input_path = sys.argv[2]
+        config.input_dir = json_config["input_dir"]
+        config.output_dir = json_config["output_dir"]
+        config.texture_dir = json_config["texture_dir"]
+        config.is_edge_darken = json_config["is_edge_darken"]
+        config.is_dry_brush = json_config["is_dry_brush"]
 
-    cv2.imwrite(
-        "{}Sample_{}_{}.png".format(config.output_dir, name, "origin"),
-        img,
-    )
-    # timer = Timer()
+    else:
+        print("Wrong input format!\nYou can try commands below")
 
-    # PerformAbstract(img)
-    # print(f"Abstraction\n{timer.Tick()} seconds\n")
+    if len(input_path.split("/")[-1].split(".")) < 2:
+        # render all files in dir
+        input_dir = input_path
+        for (root, dirs, files) in os.walk(input_dir):
+            dir = root[len(input_dir) + 1 :]
+            for file in files:
+                path = os.path.join(root, file)
+                print(f"Rendering {path}")
+                img = tools.LoadImage(path)
+                img = Watercolorization(img, config)
+                out_path = os.path.join(os.path.join(config.output_dir, dir), file)
+                cv2.imwrite(out_path, img)
+                print("finish\n")
+
+    else:
+        input_name = input_path.split("/")[-1]
+        print(f"Rendering {input_path}")
+        img = tools.LoadImage(input_path)
+        img = Watercolorization(img, config)
+        out_path = os.path.join(config.output_dir, input_name)
+        cv2.imwrite(out_path, img)
+
+    # img = tools.LoadImage(path)
+    # img = Watercolorization(img, config)
+
     # cv2.imwrite(
-    #     "../img/output/Sample_{}_{}.png".format(name, "Abstraction"),
-    #     img[450:700, 350:500],
+    #     "{}Sample_{}_{}.png".format(config.output_dir, name, "origin"),
+    #     img,
     # )
-    # edge = cv2.Canny(img, 150, 200)
-    # element = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    # # cv2.imwrite("../img/output/{}_{}.png".format(name, "edge"), edge)
-    # cv2.morphologyEx(edge, cv2.MORPH_DILATE, element, edge, iterations=2)
-    # noise_perlin = tools.LoadImage(
-    #     "../img/output/NoisePerlin/perlin_72.jpg", cv2.IMREAD_GRAYSCALE
-    # )
-    # cv2.imwrite("../img/output/{}_{}.png".format(name, "edgeDia"), edge)
-    # cv2.imwrite(
-    #     "../img/output/Sample_{}_{}.png".format(name, "edgeDia"),
-    #     edge[450:700, 350:500],
-    # )
-
-    # # img = Render(img, "../img/pipeline/TextureCombined_old.jpg")
-    # # print(f"Render\n{timer.Tick()} seconds\n\n")
-    # # cv2.imwrite(
-    # #     "../img/output/Sample_{}_{}.png".format(name, "Render"), img[450:800, 350:700]
-    # # )
-
-    # img = EdgeDarken(img, edge, "../img/pipeline/TextureCombined_old.jpg")
-    # print(f"EdgeDarken\n{timer.Tick()} seconds\n\n")
-    # cv2.imwrite(
-    #     "../img/output/Sample_{}_{}.png".format(name, "EdgeDarken"),
-    #     img[450:700, 350:500],
-    # )
-    # cv2.imwrite(
-    #     "../img/output/{}_{}.png".format(name, "EdgeDarken_compare"),
-    #     img[500:700, 550:750],
-    # )
-    # count = 0
-    # for i in range(1080):
-    #     for j in range(720):
-    #         if edge[i][j] != 255:
-    #             continue
-    #         offset = noise_perlin[i][j]
-    #         if is_dry_brush and offset == 99:
-    #             img[i][j][0] = 255
-    #             img[i][j][1] = 255
-    #             img[i][j][2] = 255
-    #         else:
-    #             offset = int(0.03 * (int(noise_perlin[i][j]) - 128))
-    #             img[i][j] = img[i][(j + offset + 720) % 720]
-    #         count = count + 1
-    # print(count)
-    # cv2.imwrite("../img/output/{}_{}.png".format(name, "Humble_0.03"), img)
-    # cv2.imwrite(
-    #     "../img/output/{}_{}.png".format(name, "Cut_Humble_0.03"), img[0:550, 240:480]
-    # )
-    ############################################################
-    # Pipe Line
-    ############################################################
-    # save_dir = "../img/demo/out"
-    # if not os.path.exists(save_dir):
-    #     os.makedirs(save_dir)
-    # i = 0
-    # for root, dirs, files in os.walk("../img/demo", topdown=False):
-    #     if root.endswith("out"):
-    #         continue
-    #     for file_name in files:
-    #         [name, end] = file_name.split(".")
-    #         path = os.path.join(root, file_name)
-    #         img = tools.LoadImage(path)
-    #         timer = Timer()
-    #         PerformAbstract(img)
-    #         print(f"Abstraction\n{timer.Tick()} seconds\n")
-    #         edge = cv2.Canny(img, 75, 175)
-    #         element = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    #         # cv2.imwrite("../img/output/{}_{}.png".format(name, "edge"), edge)
-    #         cv2.morphologyEx(edge, cv2.MORPH_DILATE, element, edge, iterations=2)
-    #         # cv2.imwrite("../img/output/{}_{}.png".format(name, "edgeDia"), edge)
-
-    #         # img = Render(img, "../img/pipeline/TextureCombined.jpg")
-    #         img = EdgeDarken(img, edge, "../img/pipeline/TextureCombined_old.jpg")
-
-    #         print(f"Render\n{timer.Tick()} seconds\n\n")
-    #         # cv2.imshow("demo", img)
-    #         # cv2.waitKey()
-    #         cv2.imwrite("../img/demo/out/{}.png".format(file_name), img)
-
-    ############################################################
-    # Module Test
-    ############################################################
-    # tools.GetCombinedTexture(img_dir + "pipeline")
-    # tools.GetDryBrush("../img/pipeline")
-
-    ############################################################
-    # Do Tests and generate results at ../img/output
-    ############################################################
-    # Tester.TestKMeans(path, "../img/output/KMeans")
-    # Tester.TestGrid(path, "../img/output/Grid")
-    # Tester.TestMeanShift(path, "../img/output/Meanshift")
-    # Tester.TestMorph(path, "../img/output/Morph")
-    # Tester.TestColorDensity("../img/output/Color")
-    # Tester.TestNoiseGauss("../img/output/NoiseGauss")
-    # Tester.TestNoisePerlin("../img/output/NoisePerlin")

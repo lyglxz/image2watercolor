@@ -8,7 +8,7 @@ import os
 def LoadImage(path: str, color=cv2.IMREAD_COLOR, size=(720, 1080)):
     img = cv2.imread(path, color)
     shape = img.shape
-    print(img.shape)
+    # print(img.shape)
     # need to reshape
     img = cv2.resize(img, (int(size[1] * shape[1] / shape[0]), size[1]))
 
