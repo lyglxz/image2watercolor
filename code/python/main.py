@@ -22,7 +22,7 @@ class Config(object):
     texture_dir = "../../resource/image/texture"
     is_edge_darken = True
     is_wobble = True
-    is_dry_brush = True
+    is_dry_brush = False
 
 
 class Timer(object):
@@ -103,7 +103,7 @@ def Wobble(img, edge, texture, config):
                 img[i][j][2] = 255
             else:
                 offset = int(
-                    0.05
+                    0.03
                     * (
                         int(
                             texture[(i + texture_height) % texture_height][
@@ -114,8 +114,8 @@ def Wobble(img, edge, texture, config):
                     )
                 )
                 img[i][j] = img[i][(j + offset + 720) % 720]
-    cv2.imshow("wobble", img)
-    cv2.waitKey()
+    # cv2.imshow("wobble", img)
+    # cv2.waitKey()
     return img
 
 
