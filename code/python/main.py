@@ -127,9 +127,11 @@ def Watercolorization(img, config: Config):
     print(f"\tEdgeDetect \tusing \t{timer.Tick():.3f} sec")
     # texture must have same shape
     if config.is_edge_darken:
-        EdgeDarken(img, edge, os.path.join(config.texture_dir, "TextureCombined.jpg"))
+        img = EdgeDarken(
+            img, edge, os.path.join(config.texture_dir, "TextureCombined.jpg")
+        )
     else:
-        Render(img, config.texture_path)
+        img = Render(img, os.path.join(config.texture_dir, "TextureCombined.jpg"))
     print(f"\tRendering \tusing \t{timer.Tick():.3f} sec")
     if config.is_wobble:
         wobble_texture = tools.LoadImage(
