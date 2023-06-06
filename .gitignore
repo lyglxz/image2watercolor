@@ -1,1 +1,3 @@
 output/*.*
+code/cpp/img/*.*
+code/cpp/build/*
