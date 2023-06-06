@@ -1,4 +1,8 @@
 {
-    "input_path": "../image/input/demo.png",
-    "output_path": "../../output"
+    "input_dir": "../image/input/demo.png",
+    "output_dir": "../../output",
+    "texture_dir": "../../resource/image/texture",
+    "is_edge_darken": true,
+    "is_wobble": true,
+    "is_dry_brush": true
 }

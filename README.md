@@ -9,3 +9,17 @@ with Artistic Verisimilitude](https://ieeexplore.ieee.org/document/6732968#:~:te
 4. Android demo app for esay use
 5. pipeline optimize for real-time performance
 6. Make All module args configable
+
+## For Python:
+quick start:` 
+```shell
+cd code/python
+# render image
+python main.py ../../resource/image/input/01.png
+
+# render images in dir 
+python main.py ../../resource/image/input
+
+# render with personal config
+python main.py ./resource/configs/default.json ../../resource/image/input/01.png
+```
